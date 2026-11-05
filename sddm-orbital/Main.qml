@@ -152,12 +152,6 @@ Rectangle {
         id: boomSequence
         onFinished: {
             root.doLogin()
-            // A sensor win committed auth before the wind-up ran; the reveal
-            // that the password path plays on loginSucceeded belongs here.
-            if (root._sensorWindup) {
-                root._sensorWindup = false
-                root.playUnlockReveal()
-            }
         }
         NumberAnimation { target: root; property: "boomScale"; to: 35.0; duration: 150; easing.type: Easing.InQuad }
         NumberAnimation { target: root; property: "boomOpacity"; to: 1.0; duration: 120; easing.type: Easing.InQuad }
@@ -168,7 +162,7 @@ Rectangle {
     ParallelAnimation {
         id: boomReveal
         NumberAnimation { target: root; property: "boomScale"; to: 35.0; duration: 190; easing.type: Easing.InQuad }
-        NumberAnimation { target: root; property: "boomOpacity"; to: 1.0; duration: 130; easing.type: Easing.InQuad }
+        NumberAnimation { target: root; property: "boomOpacity"; to: 1.0; duration: 120; easing.type: Easing.InQuad }
     }
 
     readonly property real smoothSecAngle: -((localTimeMS % 60000) / 60000.0) * 360.0 - windupOffset * 10.0
@@ -198,13 +192,7 @@ Rectangle {
         keyboard.numLock = true
         if (typeof sessionModel !== "undefined")
             root.sessionIndex = preferredSessionIndex()
-        // in-session lock paints only once secure; the greeter is up at load
-        if (root.enableWindup) {
-            if (!(typeof sddm !== "undefined" && sddm.fingerprintHint === true))
-                playLockReveal()
-        } else {
-            fadeIn.start()
-        }
+        fadeIn.start()
     }
     NumberAnimation { id: fadeIn; target: root; property: "uiOpacity"; to: 1; duration: 350; easing.type: Easing.OutCubic }
 
@@ -416,10 +404,9 @@ Rectangle {
         }
     }
 
-    Timer { id: boomTriggerTimer; interval: 1450; onTriggered: { boomSequence.start() } }
+    Timer { id: boomTriggerTimer; interval: 500; onTriggered: { boomSequence.start() } }
     function startLoginSequence() {
-        if (isWindup) return
-        // PAM never answers an empty key; the reveal blast would strand white.
+        // PAM never answers an empty key.
         if (passInput.text.length === 0) {
             errText.text = ""
             passInput.forceActiveFocus()
@@ -448,7 +435,7 @@ Rectangle {
     }
     Timer {
         id: authWatchdog
-        interval: 8000
+        interval: 3000
         onTriggered: { clearUnlockFlash(); root.authInfo = ""; errText.text = ""; passInput.text = ""; passInput.forceActiveFocus() }
     }
     function capitalizeFirst(str) { if (!str) return ""; return str.charAt(0).toUpperCase() + str.slice(1) }
@@ -456,15 +443,13 @@ Rectangle {
     Connections {
         target: typeof sddm !== "undefined" ? sddm : null
         ignoreUnknownSignals: true
-        function onSurfaceRevealed() { playLockReveal() }
+        function onSurfaceRevealed() { fadeIn.start() }
         function onInformationMessage(message) { root.authInfo = message || ""; errText.text = root.authInfo.toUpperCase(); passInput.forceActiveFocus() }
         function onErrorMessage(message) { errText.text = (message || "").toUpperCase() }
         function onLoginSucceeded() {
             authWatchdog.stop()
             if (typeof sddm !== "undefined" && sddm.fingerprintUnlock === true) {
-                // Sensor win: auth is already committed. Run the same wind-up
-                // the password path plays; _unlocked keeps boomSequence's
-                // doLogin() from re-authenticating.
+                // Sensor win: auth is already committed.
                 _unlocked = true
                 if (root.enableWindup) {
                     _sensorWindup = true
@@ -475,8 +460,7 @@ Rectangle {
                     boomReveal.start()
                 }
             } else if (root.enableWindup) {
-                // Password win: the wind-up already ran; lower the curtain.
-                playUnlockReveal()
+                // Password win: animation already started with doLogin()
             }
         }
         function onLoginFailed() { authWatchdog.stop(); clearUnlockFlash(); root.authInfo = ""; errText.text = I18n.tr("ACCESS DENIED"); passInput.text = ""; passInput.forceActiveFocus(); shake.start() }
@@ -493,60 +477,7 @@ Rectangle {
         Text { text: "✦"; anchors.left: actTxt.right; anchors.leftMargin: 4 * s; anchors.verticalCenter: actTxt.verticalCenter; color: root.mainText; opacity: actM.containsMouse ? 1.0 : 0; font.pixelSize: 8 * s; Behavior on opacity { NumberAnimation { duration: 200 } } }
         MouseArea { id: actM; anchors.fill: parent; hoverEnabled: true; onClicked: { actItem.clicked() } cursorShape: Qt.PointingHandCursor }
     }
-    // swww-style circular reveal: an inverted OpacityMask punches a growing
-    // hole in a surface-colour curtain; the layers drop when idle.
-    readonly property real revealDiag: Math.sqrt(width * width + height * height)
-    property real revealR: 0
-    property bool revealActive: false
 
-    Item {
-        id: revealCurtain
-        anchors.fill: parent
-        z: 20000
-        visible: root.revealActive
-        layer.enabled: root.revealActive
-        layer.effect: OpacityMask { invert: true; maskSource: revealMaskSrc }
-        Rectangle { anchors.fill: parent; color: root.bgColor }
-    }
-    Item {
-        id: revealMaskSrc
-        anchors.fill: parent
-        visible: false
-        layer.enabled: root.revealActive
-        Rectangle {
-            anchors.centerIn: parent
-            width: root.revealR * 2
-            height: root.revealR * 2
-            radius: root.revealR
-            color: "white"
-        }
-    }
-
-    NumberAnimation {
-        id: revealIn
-        target: root; property: "revealR"
-        from: 0; to: root.revealDiag; duration: 1150; easing.type: Easing.InOutCubic
-        onFinished: root.revealActive = false
-    }
-    NumberAnimation {
-        id: revealOut
-        target: root; property: "revealR"
-        from: root.revealDiag; to: 0; duration: 560; easing.type: Easing.InOutCubic
-    }
-
-    function playLockReveal() {
-        revealOut.stop()
-        root.uiOpacity = 1
-        root.revealR = 0
-        root.revealActive = true
-        revealIn.restart()
-    }
-    function playUnlockReveal() {
-        revealIn.stop()
-        root.revealR = root.revealDiag
-        root.revealActive = true
-        revealOut.restart()
-    }
 
     // Prefer the session matching the running compositor, resolved from the
     // environment by the shim (sessionModel.desktopName), never a name literal.
