@@ -29,14 +29,14 @@ Rectangle {
     // runs on the shell's own compositor, which draws a real cursor, so off there.
     HoverHandler {
         id: swPointer
-        enabled: !root.isQuickshell
+        enabled: false
     }
     Canvas {
         id: swCursor
         width: 26 * root.s
         height: 26 * root.s
         z: 2000000
-        visible: !root.isQuickshell && swPointer.hovered
+        visible: false
         x: swPointer.point.position.x
         y: swPointer.point.position.y
         antialiasing: true
@@ -338,6 +338,16 @@ Rectangle {
                     text: ((userHelper.currentItem && userHelper.currentItem.uName) ? userHelper.currentItem.uName : ((typeof userModel !== "undefined" && userModel.lastUser) ? capitalizeFirst(userModel.lastUser) : I18n.tr("USER"))).toUpperCase()
                     font.family: outfitFont.name; font.pixelSize: 18 * s; font.weight: Font.Bold; font.letterSpacing: 8 * s; color: (uMa.containsMouse || root.userMenuOpen) ? root.mainText : root.dimText; Behavior on color { ColorAnimation { duration: 200 } } Behavior on anchors.rightMargin { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
                 }
+                Image {
+                    id: userImage
+                    source: "image.png"
+                    anchors.right: parent.right
+                    anchors.rightMargin: - 170 * s
+                    y: userNameDisp.y - 430 * s - 10 * s
+                    width: 480 * s
+                    height: 480 * s
+                    fillMode: Image.PreserveAspectFit
+                }
                 Text { text: "✦"; anchors.left: userNameDisp.right; anchors.leftMargin: 8 * s; anchors.verticalCenter: userNameDisp.verticalCenter; color: root.mainText; opacity: (uMa.containsMouse || root.userMenuOpen) ? 1.0 : 0; font.pixelSize: 12 * s; Behavior on opacity { NumberAnimation { duration: 200 } } }
                 MouseArea { id: uMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { root.userMenuOpen = !root.userMenuOpen } }
             }
@@ -378,7 +388,7 @@ Rectangle {
                 TextInput {
                     id: passInput; anchors.fill: parent; echoMode: TextInput.Password; passwordCharacter: "✦"; color: root.dimText; font.family: outfitFont.name; font.pixelSize: 14 * s; font.letterSpacing: 10 * s; horizontalAlignment: TextInput.AlignRight; verticalAlignment: TextInput.AlignVCenter; focus: true; property bool wasClicked: false; cursorVisible: false; cursorDelegate: Item { width: 0; height: 0 }
                     Keys.onReturnPressed: startLoginSequence()
-                    Keys.onPressed: {
+                    Keys.onPressed: (event) => {
                         if (event.key === Qt.Key_Enter) {
                             event.accepted = true
                             startLoginSequence()
@@ -472,8 +482,8 @@ Rectangle {
         NumberAnimation { target: loginPanel; property: "anchors.rightMargin"; to: root.marginR; duration: 50; easing.type: Easing.InOutSine }
     }
     component CwAction: Item {
-        id: actItem; width: actTxt.width + 20 * s; height: 15 * s; property string label: ""; signal clicked()
-        Text { id: actTxt; anchors.right: parent.right; anchors.rightMargin: actM.containsMouse ? 15 * s : 0; text: label.toUpperCase(); color: actM.containsMouse ? root.mainText : root.dimText; font.family: outfitFont.name; font.pixelSize: 10 * s; font.letterSpacing: 3 * s; Behavior on color { ColorAnimation { duration: 200 } } Behavior on anchors.rightMargin { NumberAnimation { duration: 200 } } }
+        id: actItem; width: actTxt.width + 20 * s; height: 44 * s; property string label: ""; signal clicked()
+        Text { id: actTxt; anchors.right: parent.right; anchors.rightMargin: actM.containsMouse ? 15 * s : 0; anchors.verticalCenter: parent.verticalCenter; text: label.toUpperCase(); color: actM.containsMouse ? root.mainText : root.dimText; font.family: outfitFont.name; font.pixelSize: 10 * s; font.letterSpacing: 3 * s; Behavior on color { ColorAnimation { duration: 200 } } Behavior on anchors.rightMargin { NumberAnimation { duration: 200 } } }
         Text { text: "✦"; anchors.left: actTxt.right; anchors.leftMargin: 4 * s; anchors.verticalCenter: actTxt.verticalCenter; color: root.mainText; opacity: actM.containsMouse ? 1.0 : 0; font.pixelSize: 8 * s; Behavior on opacity { NumberAnimation { duration: 200 } } }
         MouseArea { id: actM; anchors.fill: parent; hoverEnabled: true; onClicked: { actItem.clicked() } cursorShape: Qt.PointingHandCursor }
     }
